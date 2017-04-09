@@ -1,0 +1,88 @@
+-------------------------------------------------------------------------------------------------------------------------
+Table Creation
+-------------------------------------------------------------------------------------------------------------------------
+CREATE TABLE Entity(
+    EntityId int NOT NULL,
+	EntityName varchar(100) NOT NULL,
+	PRIMARY KEY (EntityId)
+ ); 
+ 
+ CREATE TABLE Balances(
+	BalanceID int NOT NULL,
+	EntityId int NOT NULL,
+	BalanceDate date NULL,
+	Balance double NULL,
+	PRIMARY KEY (BalanceID)
+);
+
+CREATE TABLE StatusLog(
+	StatusId int NOT NULL,
+	EntityId int NOT NULL,
+	StatusDate date NULL,
+	Status varchar(10) NULL,
+	PRIMARY KEY (StatusId)
+);
+
+-------------------------------------------------------------------------------------------------------------------------
+Adding Foreign key constraint
+-------------------------------------------------------------------------------------------------------------------------
+ALTER TABLE Balances ADD CONSTRAINT FK_Balances FOREIGN KEY (EntityId) REFERENCES Entity(EntityId);
+
+ALTER TABLE StatusLog ADD CONSTRAINT FK_StatusLog FOREIGN KEY (EntityId) REFERENCES Entity(EntityId);
+
+-------------------------------------------------------------------------------------------------------------------------
+Insert values into tables
+-------------------------------------------------------------------------------------------------------------------------
+INSERT INTO Entity (EntityId, EntityName) VALUES (1, 'ABCD');
+INSERT INTO Entity (EntityId, EntityName) VALUES (2, 'XYZ');
+
+INSERT INTO Balances (BalanceID, EntityId, BalanceDate, Balance) VALUES (1, 1, STR_TO_DATE('5/1/2010','%m/%d/%Y'), 100.00);
+INSERT INTO Balances (BalanceID, EntityId, BalanceDate, Balance) VALUES (2, 1, STR_TO_DATE('4/1/2010','%m/%d/%Y'), 50.00);
+INSERT INTO Balances (BalanceID, EntityId, BalanceDate, Balance) VALUES (3, 1, STR_TO_DATE('3/1/2010','%m/%d/%Y'), 75.00);
+INSERT INTO Balances (BalanceID, EntityId, BalanceDate, Balance) VALUES (4, 1, STR_TO_DATE('2/1/2010','%m/%d/%Y'), 85.00);
+INSERT INTO Balances (BalanceID, EntityId, BalanceDate, Balance) VALUES (5, 2, STR_TO_DATE('5/1/2010','%m/%d/%Y'), 110.00);
+
+INSERT INTO StatusLog (StatusId, EntityId, StatusDate, Status) VALUES (1, 1, STR_TO_DATE('5/29/2010','%m/%d/%Y'), 'A');
+INSERT INTO StatusLog (StatusId, EntityId, StatusDate, Status) VALUES (2, 1, STR_TO_DATE('4/16/2010','%m/%d/%Y'), 'B');
+INSERT INTO StatusLog (StatusId, EntityId, StatusDate, Status) VALUES (3, 1, STR_TO_DATE('4/2/2010','%m/%d/%Y'), 'C');
+INSERT INTO StatusLog (StatusId, EntityId, StatusDate, Status) VALUES (4, 1, STR_TO_DATE('2/26/2010','%m/%d/%Y'), 'D');
+INSERT INTO StatusLog (StatusId, EntityId, StatusDate, Status) VALUES (5, 2, STR_TO_DATE('5/1/2010','%m/%d/%Y'), 'B');
+
+-------------------------------------------------------------------------------------------------------------------------
+Query 1
+-------------------------------------------------------------------------------------------------------------------------
+
+SELECT en.EntityName, DATE_FORMAT(bal.BalanceDate, '%m/%d/%Y') AS BalanceDate, bal.Balance, sl.Status
+FROM Entity AS en
+INNER JOIN Balances AS bal on en.EntityId = bal.EntityId
+LEFT JOIN (
+	SELECT b.EntityId, b.BalanceDate, max(s.StatusDate) as StatusDate
+	FROM Balances AS b 
+	INNER JOIN StatusLog AS s ON b.EntityId = s.EntityId
+	where  s.StatusDate <= b.BalanceDate
+	group by b.EntityId, b.BalanceDate, b.Balance) R on R.EntityId = bal.EntityId
+		AND R.BalanceDate = bal.BalanceDate
+LEFT JOIN StatusLog AS sl ON R.EntityId = sl.EntityId
+		AND R.StatusDate = sl.StatusDate
+order by bal.BalanceDate desc;
+
+-------------------------------------------------------------------------------------------------------------------------
+Query 2
+-------------------------------------------------------------------------------------------------------------------------
+
+SELECT en.EntityId, en.EntityName, DATE_FORMAT(sl.StatusDate, '%m/%d/%Y') AS StatusDate, bal.AvgBal, sl.Status	
+FROM Entity AS en
+INNER JOIN ( 
+	SELECT b.EntityId, max(b.BalanceDate) BalanceDate, AVG( b.Balance ) AvgBal
+	FROM Balances AS b
+	group by b.EntityId
+	) As bal on en.EntityId = bal.EntityId
+LEFT JOIN (
+	SELECT b.EntityId, b.BalanceDate, min(s.StatusDate) as StatusDate
+	FROM Balances AS b 
+	INNER JOIN StatusLog AS s ON b.EntityId = s.EntityId
+	where  s.StatusDate >= b.BalanceDate
+	group by b.EntityId, b.BalanceDate, b.Balance) R on R.EntityId = bal.EntityId
+			AND R.BalanceDate = bal.BalanceDate
+LEFT JOIN StatusLog AS sl ON R.EntityId = sl.EntityId
+			AND R.StatusDate = sl.StatusDate
